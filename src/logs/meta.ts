@@ -19,6 +19,35 @@ export const TAB_TITLE: Record<TabKey, string> = {
   brumation: 'Log Brumasi',
 };
 
+/** Teks kosong khusus tiap kategori, supaya arahannya konkret. */
+export const EMPTY_STATES: Record<TabKey, { title: string; subtitle: string }> = {
+  growth: {
+    title: 'Belum ada data pertumbuhan',
+    subtitle:
+      'Catat berat dan panjang karapas secara berkala — minimal dua entri agar grafik trennya muncul.',
+  },
+  feeding: {
+    title: 'Belum ada catatan makan',
+    subtitle:
+      'Rekam jenis pakan, porsi, dan frekuensinya untuk memantau variasi diet dan asupan kalsium.',
+  },
+  shell: {
+    title: 'Belum ada pemeriksaan karapas',
+    subtitle:
+      'Periksa karapas rutin dan foto kondisinya. Piramiding, soft shell, atau jamur akan ditandai otomatis.',
+  },
+  health: {
+    title: 'Belum ada riwayat sakit',
+    subtitle:
+      'Semoga tetap begitu. Bila ada keluhan, catat tanggal mulai dan penanganannya untuk dibawa ke dokter hewan.',
+  },
+  brumation: {
+    title: 'Belum ada catatan brumasi',
+    subtitle:
+      'Saat hewan mulai brumasi, catat tanggal dan berat awalnya agar penurunan berat bisa dipantau.',
+  },
+};
+
 /** Preset pakan umum untuk kura-kura darat. */
 export const FOOD_PRESETS = [
   'Rumput odot',

@@ -4,6 +4,7 @@ import { Alert, Pressable, ScrollView, View } from 'react-native';
 import { MAX_PHOTOS_PER_LOG } from '../db/types';
 import { captureImage, deleteImage, pickImagesFromLibrary } from '../lib/media';
 import { useTheme } from '../theme/ThemeProvider';
+import { useConfirm } from './ConfirmDialog';
 import { Body, Label, Row, Thumb } from './ui';
 
 /**
@@ -22,6 +23,7 @@ export function PhotoPicker({
   label?: string;
 }) {
   const { theme } = useTheme();
+  const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
   const remaining = max - uris.length;
   // Foto yang sudah tersimpan di database tidak boleh dihapus dari disk di sini —
@@ -41,18 +43,17 @@ export function PhotoPicker({
     }
   };
 
-  const remove = (uri: string) => {
-    Alert.alert('Hapus foto?', 'Foto ini akan dilepas dari catatan.', [
-      { text: 'Batal', style: 'cancel' },
-      {
-        text: 'Hapus',
-        style: 'destructive',
-        onPress: () => {
-          onChange(uris.filter(u => u !== uri));
-          if (!savedUris.current.has(uri)) deleteImage(uri);
-        },
-      },
-    ]);
+  const remove = async (uri: string) => {
+    const ok = await confirm({
+      title: 'Hapus foto ini?',
+      message: 'Foto akan dilepas dari catatan saat perubahan disimpan.',
+      confirmLabel: 'Hapus foto',
+      destructive: true,
+      icon: 'image-outline',
+    });
+    if (!ok) return;
+    onChange(uris.filter(u => u !== uri));
+    if (!savedUris.current.has(uri)) deleteImage(uri);
   };
 
   return (

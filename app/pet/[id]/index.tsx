@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import type { SQLiteDatabase } from 'expo-sqlite';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
+import PagerView from 'react-native-pager-view';
 import { GrowthChart } from '../../../src/components/GrowthChart';
 import {
   Badge,
@@ -28,7 +29,13 @@ import type {
 } from '../../../src/db/types';
 import { useDbQuery } from '../../../src/hooks/useDbQuery';
 import { daysBetween, formatAge, formatDate } from '../../../src/lib/date';
-import { SHELL_CONDITIONS, TABS, shellCondition, type TabKey } from '../../../src/logs/meta';
+import {
+  EMPTY_STATES,
+  SHELL_CONDITIONS,
+  TABS,
+  shellCondition,
+  type TabKey,
+} from '../../../src/logs/meta';
 import { useTheme } from '../../../src/theme/ThemeProvider';
 
 type Entry = { row: Record<string, unknown>; photos: Photo[] };
@@ -56,6 +63,7 @@ export default function PetDetailScreen() {
   const { theme } = useTheme();
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>('growth');
+  const pager = useRef<PagerView>(null);
 
   const { data, loading } = useDbQuery(db => loadPetData(db, petId), [petId]);
 
@@ -68,7 +76,7 @@ export default function PetDetailScreen() {
   }
 
   const { pet, entries } = data;
-  const current = entries[tab];
+  const activeIndex = TABS.findIndex(item => item.key === tab);
 
   return (
     <Screen>
@@ -85,87 +93,76 @@ export default function PetDetailScreen() {
         }}
       />
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100, gap: 14 }}>
+      <View style={{ padding: 16, paddingBottom: 0, gap: 12 }}>
         <ProfileCard pet={pet} />
 
-        <View style={{ gap: 10 }}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-            {TABS.map(item => {
-              const active = item.key === tab;
-              return (
-                <Pressable
-                  key={item.key}
-                  onPress={() => setTab(item.key)}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+          {TABS.map((item, index) => {
+            const active = item.key === tab;
+            return (
+              <Pressable
+                key={item.key}
+                onPress={() => pager.current?.setPage(index)}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingHorizontal: 14,
+                  paddingVertical: 9,
+                  borderRadius: 999,
+                  borderWidth: 1,
+                  backgroundColor: active ? theme.colors.primary : theme.colors.surface,
+                  borderColor: active ? theme.colors.primary : theme.colors.border,
+                }}>
+                <Ionicons
+                  name={item.icon}
+                  size={15}
+                  color={active ? theme.colors.onPrimary : theme.colors.textMuted}
+                />
+                <Body
                   style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 6,
-                    paddingHorizontal: 14,
-                    paddingVertical: 9,
-                    borderRadius: 999,
-                    borderWidth: 1,
-                    backgroundColor: active ? theme.colors.primary : theme.colors.surface,
-                    borderColor: active ? theme.colors.primary : theme.colors.border,
+                    color: active ? theme.colors.onPrimary : theme.colors.text,
+                    fontWeight: active ? '700' : '500',
+                    fontSize: 13,
                   }}>
-                  <Ionicons
-                    name={item.icon}
-                    size={15}
-                    color={active ? theme.colors.onPrimary : theme.colors.textMuted}
-                  />
+                  {item.label}
+                </Body>
+                {entries[item.key].length ? (
                   <Body
                     style={{
-                      color: active ? theme.colors.onPrimary : theme.colors.text,
-                      fontWeight: active ? '700' : '500',
-                      fontSize: 13,
+                      fontSize: 11,
+                      color: active ? theme.colors.onPrimary : theme.colors.textMuted,
                     }}>
-                    {item.label}
+                    {entries[item.key].length}
                   </Body>
-                  {entries[item.key].length ? (
-                    <Body
-                      style={{
-                        fontSize: 11,
-                        color: active ? theme.colors.onPrimary : theme.colors.textMuted,
-                      }}>
-                      {entries[item.key].length}
-                    </Body>
-                  ) : null}
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
+                ) : null}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
 
-        {tab === 'growth' && current.length > 0 ? (
-          <Card>
-            <Label>Tren pertumbuhan</Label>
-            <GrowthChart data={current.map(e => e.row as unknown as GrowthLog)} />
-          </Card>
-        ) : null}
-
-        {tab === 'shell' ? <ShellWarnings entries={current} /> : null}
-
-        {current.length === 0 ? (
-          <EmptyState
-            icon={TABS.find(t => t.key === tab)!.icon}
-            title="Belum ada catatan"
-            subtitle="Ketuk tombol di bawah untuk menambahkan entri pertama pada kategori ini."
-          />
-        ) : (
-          current.map(entry => (
-            <LogCard
-              key={String(entry.row.id)}
-              tab={tab}
-              entry={entry}
-              onPress={() =>
+      <PagerView
+        ref={pager}
+        style={{ flex: 1 }}
+        initialPage={activeIndex < 0 ? 0 : activeIndex}
+        onPageSelected={event => setTab(TABS[event.nativeEvent.position].key)}>
+        {/* Setiap halaman pager harus berupa View langsung. */}
+        {TABS.map(item => (
+          <View key={item.key} style={{ flex: 1 }}>
+            <TabPage
+              tab={item.key}
+              entries={entries[item.key]}
+              onOpen={logId =>
                 router.push({
                   pathname: '/pet/[id]/log/[type]',
-                  params: { id: petId, type: tab, logId: String(entry.row.id) },
+                  params: { id: petId, type: item.key, logId: String(logId) },
                 })
               }
             />
-          ))
-        )}
-      </ScrollView>
+          </View>
+        ))}
+      </PagerView>
 
       <View style={{ position: 'absolute', left: 16, right: 16, bottom: 24 }}>
         <Button
@@ -180,44 +177,90 @@ export default function PetDetailScreen() {
   );
 }
 
+/** Satu halaman pager: isi salah satu kategori log, bisa digulir sendiri. */
+function TabPage({
+  tab,
+  entries,
+  onOpen,
+}: {
+  tab: TabKey;
+  entries: Entry[];
+  onOpen: (logId: number) => void;
+}) {
+  const empty = EMPTY_STATES[tab];
+  return (
+    <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 4, paddingBottom: 100, gap: 14 }}>
+      {tab === 'growth' && entries.length > 0 ? (
+        <Card>
+          <Label>Tren pertumbuhan</Label>
+          <GrowthChart data={entries.map(e => e.row as unknown as GrowthLog)} />
+        </Card>
+      ) : null}
+
+      {tab === 'shell' ? <ShellWarnings entries={entries} /> : null}
+
+      {entries.length === 0 ? (
+        <EmptyState
+          icon={TABS.find(t => t.key === tab)!.icon}
+          title={empty.title}
+          subtitle={empty.subtitle}
+        />
+      ) : (
+        entries.map(entry => (
+          <LogCard
+            key={String(entry.row.id)}
+            tab={tab}
+            entry={entry}
+            onPress={() => onOpen(entry.row.id as number)}
+          />
+        ))
+      )}
+    </ScrollView>
+  );
+}
+
 function ProfileCard({ pet }: { pet: Pet }) {
   const { theme } = useTheme();
   const genderLabel = { male: 'Jantan', female: 'Betina', unknown: 'Belum diketahui' }[pet.gender];
 
+  // Kartu ini tetap di atas saat halaman digeser, jadi dibuat ringkas.
   return (
-    <Card>
-      <Row style={{ gap: 14 }}>
+    <Card style={{ padding: 12, gap: 6 }}>
+      <Row style={{ gap: 12 }}>
         {pet.photo_uri ? (
-          <Thumb uri={pet.photo_uri} size={88} />
+          <Thumb uri={pet.photo_uri} size={64} />
         ) : (
           <View
             style={{
-              width: 88,
-              height: 88,
+              width: 64,
+              height: 64,
               borderRadius: 10,
               backgroundColor: theme.colors.surfaceAlt,
               alignItems: 'center',
               justifyContent: 'center',
             }}>
-            <Ionicons name="paw" size={32} color={theme.colors.textMuted} />
+            <Ionicons name="paw" size={26} color={theme.colors.textMuted} />
           </View>
         )}
-        <View style={{ flex: 1, gap: 4 }}>
-          <Title>{pet.name}</Title>
-          <Body muted>{pet.species || 'Spesies belum diisi'}</Body>
-          <Row style={{ flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+        <View style={{ flex: 1, gap: 3 }}>
+          <Title style={{ fontSize: 17 }} numberOfLines={1}>
+            {pet.name}
+          </Title>
+          <Body muted style={{ fontSize: 13 }} numberOfLines={1}>
+            {pet.species || 'Spesies belum diisi'} · lahir {formatDate(pet.birth_date)}
+          </Body>
+          <Row style={{ flexWrap: 'wrap', gap: 6, marginTop: 2 }}>
             <Badge text={genderLabel} />
             <Badge tone="primary" text={formatAge(pet.birth_date)} />
           </Row>
         </View>
       </Row>
 
-      <View style={{ gap: 2, marginTop: 4 }}>
-        <Body muted style={{ fontSize: 12 }}>
-          Lahir: {formatDate(pet.birth_date)} · Adopsi: {formatDate(pet.adoption_date)}
+      {pet.note ? (
+        <Body numberOfLines={2} style={{ fontSize: 13 }}>
+          {pet.note}
         </Body>
-        {pet.note ? <Body style={{ marginTop: 6 }}>{pet.note}</Body> : null}
-      </View>
+      ) : null}
     </Card>
   );
 }

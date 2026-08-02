@@ -1,7 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
+import { useConfirm } from '../../../src/components/ConfirmDialog';
 import { PetForm } from '../../../src/components/PetForm';
 import { deletePet, getPet, updatePet, type PetInput } from '../../../src/db/repo';
 
@@ -10,6 +11,7 @@ export default function EditPetScreen() {
   const petId = Number(id);
   const db = useSQLiteContext();
   const router = useRouter();
+  const confirm = useConfirm();
   const [initial, setInitial] = useState<PetInput | null>(null);
 
   useEffect(() => {
@@ -20,23 +22,18 @@ export default function EditPetScreen() {
     });
   }, [db, petId]);
 
-  const confirmDelete = () => {
-    Alert.alert(
-      'Hapus profil?',
-      'Seluruh log pertumbuhan, makan, karapas, riwayat sakit, brumasi, dan foto milik hewan ini akan ikut terhapus permanen.',
-      [
-        { text: 'Batal', style: 'cancel' },
-        {
-          text: 'Hapus',
-          style: 'destructive',
-          onPress: async () => {
-            await deletePet(db, petId);
-            router.dismissAll();
-            router.replace('/');
-          },
-        },
-      ]
-    );
+  const confirmDelete = async () => {
+    const ok = await confirm({
+      title: `Hapus profil ${initial?.name ?? 'ini'}?`,
+      message:
+        'Seluruh log pertumbuhan, makan, karapas, riwayat sakit, brumasi, dan fotonya akan ikut terhapus permanen. Tindakan ini tidak bisa dibatalkan.',
+      confirmLabel: 'Hapus profil',
+      destructive: true,
+    });
+    if (!ok) return;
+    await deletePet(db, petId);
+    router.dismissAll();
+    router.replace('/');
   };
 
   if (!initial) {

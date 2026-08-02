@@ -5,6 +5,7 @@ import { Suspense } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ConfirmProvider } from '../src/components/ConfirmDialog';
 import { DATABASE_NAME, migrateDbIfNeeded } from '../src/db/schema';
 import { ThemeProvider, useTheme } from '../src/theme/ThemeProvider';
 
@@ -54,7 +55,9 @@ export default function RootLayout() {
               onInit={migrateDbIfNeeded}
               options={{ enableChangeListener: true }}
               useSuspense>
-              <Navigator />
+              <ConfirmProvider>
+                <Navigator />
+              </ConfirmProvider>
             </SQLiteProvider>
           </Suspense>
         </ThemeProvider>

@@ -2,11 +2,13 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { useConfirm } from '../../../../src/components/ConfirmDialog';
+import { DateField } from '../../../../src/components/DateField';
 import { PhotoPicker } from '../../../../src/components/PhotoPicker';
 import { Body, Button, Card, ChipGroup, Field, Row, Screen, Title } from '../../../../src/components/ui';
 import { listPhotos, logs } from '../../../../src/db/repo';
 import type { PhotoOwnerType } from '../../../../src/db/types';
-import { isValidISODate, today } from '../../../../src/lib/date';
+import { isValidISODate, parseISODate, today } from '../../../../src/lib/date';
 import {
   FEEDING_FREQUENCIES,
   FOOD_PRESETS,
@@ -45,6 +47,7 @@ export default function LogFormScreen() {
   const db = useSQLiteContext();
   const router = useRouter();
   const { theme } = useTheme();
+  const confirm = useConfirm();
 
   const [form, setForm] = useState<FormState>(() => {
     const base = { ...DEFAULTS[ownerType] };
@@ -192,19 +195,17 @@ export default function LogFormScreen() {
     }
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (editingId == null) return;
-    Alert.alert('Hapus catatan?', 'Catatan dan seluruh fotonya akan dihapus permanen.', [
-      { text: 'Batal', style: 'cancel' },
-      {
-        text: 'Hapus',
-        style: 'destructive',
-        onPress: async () => {
-          await logs.remove(db, ownerType, editingId);
-          router.back();
-        },
-      },
-    ]);
+    const ok = await confirm({
+      title: 'Hapus catatan ini?',
+      message: 'Catatan beserta seluruh fotonya akan dihapus permanen dari perangkat.',
+      confirmLabel: 'Hapus catatan',
+      destructive: true,
+    });
+    if (!ok) return;
+    await logs.remove(db, ownerType, editingId);
+    router.back();
   };
 
   if (loading) {
@@ -217,8 +218,6 @@ export default function LogFormScreen() {
     );
   }
 
-  const dateHelper = 'Format YYYY-MM-DD, contoh 2026-08-02.';
-
   return (
     <Screen>
       <Stack.Screen
@@ -228,7 +227,13 @@ export default function LogFormScreen() {
         <ScrollView contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 48 }}>
           {ownerType === 'growth' ? (
             <>
-              <Field label="Tanggal" value={form.date} onChangeText={set('date')} helper={dateHelper} error={errors.date} />
+              <DateField
+                label="Tanggal"
+                value={form.date}
+                onChange={set('date')}
+                error={errors.date}
+                maximumDate={new Date()}
+              />
               <Field
                 label="Berat (gram)"
                 value={form.weight_g}
@@ -250,7 +255,13 @@ export default function LogFormScreen() {
 
           {ownerType === 'feeding' ? (
             <>
-              <Field label="Tanggal" value={form.date} onChangeText={set('date')} helper={dateHelper} error={errors.date} />
+              <DateField
+                label="Tanggal"
+                value={form.date}
+                onChange={set('date')}
+                error={errors.date}
+                maximumDate={new Date()}
+              />
               <Field
                 label="Jenis pakan"
                 value={form.food_type}
@@ -276,7 +287,13 @@ export default function LogFormScreen() {
 
           {ownerType === 'shell' ? (
             <>
-              <Field label="Tanggal" value={form.date} onChangeText={set('date')} helper={dateHelper} error={errors.date} />
+              <DateField
+                label="Tanggal"
+                value={form.date}
+                onChange={set('date')}
+                error={errors.date}
+                maximumDate={new Date()}
+              />
               <ChipGroup
                 label="Kondisi karapas"
                 options={SHELL_CONDITIONS.map(c => ({ value: c.value, label: c.label }))}
@@ -312,12 +329,12 @@ export default function LogFormScreen() {
                 placeholder="Contoh: Flu / runny nose"
                 error={errors.title}
               />
-              <Field
+              <DateField
                 label="Tanggal mulai"
                 value={form.start_date}
-                onChangeText={set('start_date')}
-                helper={dateHelper}
+                onChange={set('start_date')}
                 error={errors.start_date}
+                maximumDate={new Date()}
               />
               <ChipGroup
                 label="Status"
@@ -329,12 +346,13 @@ export default function LogFormScreen() {
                 onChange={set('ongoing')}
               />
               {form.ongoing === '0' ? (
-                <Field
+                <DateField
                   label="Tanggal selesai"
                   value={form.end_date}
-                  onChangeText={set('end_date')}
-                  helper={dateHelper}
+                  onChange={set('end_date')}
                   error={errors.end_date}
+                  minimumDate={parseISODate(form.start_date) ?? undefined}
+                  maximumDate={new Date()}
                 />
               ) : null}
               <Field
@@ -349,19 +367,22 @@ export default function LogFormScreen() {
 
           {ownerType === 'brumation' ? (
             <>
-              <Field
+              <DateField
                 label="Tanggal mulai"
                 value={form.start_date}
-                onChangeText={set('start_date')}
-                helper={dateHelper}
+                onChange={set('start_date')}
                 error={errors.start_date}
+                maximumDate={new Date()}
               />
-              <Field
+              <DateField
                 label="Tanggal selesai"
                 value={form.end_date}
-                onChangeText={set('end_date')}
+                onChange={set('end_date')}
                 helper="Kosongkan bila brumasi masih berlangsung."
                 error={errors.end_date}
+                clearable
+                minimumDate={parseISODate(form.start_date) ?? undefined}
+                maximumDate={new Date()}
               />
               <Field
                 label="Berat sebelum (gram)"

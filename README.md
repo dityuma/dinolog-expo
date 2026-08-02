@@ -26,7 +26,7 @@ eas build --platform android --profile preview
 | `app/` | Rute Expo Router (file-based). `_layout.tsx` memasang `SQLiteProvider` + `ThemeProvider`. |
 | `src/db/` | Skema SQLite (`schema.ts`, migrasi via `PRAGMA user_version`), tipe, dan repository CRUD. |
 | `src/lib/` | Util tanggal, penyimpanan media internal, ekspor/impor JSON. |
-| `src/components/` | Komponen UI bertema, grafik pertumbuhan (react-native-svg), pemilih foto. |
+| `src/components/` | Komponen UI bertema: grafik pertumbuhan (react-native-svg), pemilih foto, input tanggal, dialog konfirmasi. |
 | `src/theme/` | 8 tema kura-kura, disimpan di AsyncStorage. |
 | `src/logs/` | Metadata tab log: preset pakan, kondisi karapas, teks peringatan. |
 
@@ -36,7 +36,7 @@ eas build --platform android --profile preview
 /                        daftar profil hewan
 /settings                tema, ekspor & impor data
 /pet/new                 tambah profil
-/pet/[id]                detail + tab log (Tumbuh, Makan, Karapas, Riwayat, Brumasi)
+/pet/[id]                detail + tab log yang bisa digeser (Tumbuh, Makan, Karapas, Riwayat, Brumasi)
 /pet/[id]/edit           ubah / hapus profil
 /pet/[id]/log/[type]     tambah / ubah / hapus satu entri log
 /viewer                  penampil foto layar penuh

@@ -47,7 +47,8 @@
           "photosPermission": "DinoLog membutuhkan akses galeri untuk melampirkan foto pada log peliharaan Anda.",
           "cameraPermission": "DinoLog membutuhkan akses kamera untuk memotret dokumentasi peliharaan Anda."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ]
   }
 }

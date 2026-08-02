@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView, Switch, View } from 'react-native';
+import { useConfirm } from '../src/components/ConfirmDialog';
 import { Body, Button, Card, Label, Row, Screen, Title } from '../src/components/ui';
 import { exportBackup, importBackup } from '../src/lib/backup';
 import { THEMES } from '../src/theme/themes';
@@ -12,6 +13,7 @@ export default function SettingsScreen() {
   const { theme, themeId, setThemeId } = useTheme();
   const db = useSQLiteContext();
   const router = useRouter();
+  const confirm = useConfirm();
   const [includePhotos, setIncludePhotos] = useState(true);
   const [busy, setBusy] = useState<'export' | 'import' | null>(null);
 
@@ -26,35 +28,32 @@ export default function SettingsScreen() {
     }
   };
 
-  const doImport = () => {
-    Alert.alert(
-      'Impor backup?',
-      'Seluruh data yang ada di aplikasi ini akan diganti dengan isi file backup. Ekspor dulu data Anda bila belum.',
-      [
-        { text: 'Batal', style: 'cancel' },
-        {
-          text: 'Lanjutkan',
-          style: 'destructive',
-          onPress: async () => {
-            setBusy('import');
-            try {
-              const result = await importBackup(db);
-              if (result) {
-                Alert.alert(
-                  'Impor selesai',
-                  `${result.pets} profil, ${result.logs} catatan, dan ${result.photos} foto dipulihkan.`,
-                  [{ text: 'OK', onPress: () => router.replace('/') }]
-                );
-              }
-            } catch (error) {
-              Alert.alert('Impor gagal', (error as Error).message);
-            } finally {
-              setBusy(null);
-            }
-          },
-        },
-      ]
-    );
+  const doImport = async () => {
+    const ok = await confirm({
+      title: 'Ganti semua data dengan backup?',
+      message:
+        'Seluruh profil dan catatan yang ada di aplikasi ini akan dihapus lalu diganti dengan isi file backup. Ekspor dulu bila Anda belum punya salinannya.',
+      confirmLabel: 'Pilih file backup',
+      destructive: true,
+      icon: 'cloud-upload-outline',
+    });
+    if (!ok) return;
+
+    setBusy('import');
+    try {
+      const result = await importBackup(db);
+      if (result) {
+        Alert.alert(
+          'Impor selesai',
+          `${result.pets} profil, ${result.logs} catatan, dan ${result.photos} foto dipulihkan.`,
+          [{ text: 'OK', onPress: () => router.replace('/') }]
+        );
+      }
+    } catch (error) {
+      Alert.alert('Impor gagal', (error as Error).message);
+    } finally {
+      setBusy(null);
+    }
   };
 
   return (

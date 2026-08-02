@@ -6,6 +6,7 @@ import type { Gender } from '../db/types';
 import { isValidISODate } from '../lib/date';
 import { deleteImage, pickImagesFromLibrary } from '../lib/media';
 import { useTheme } from '../theme/ThemeProvider';
+import { DateField } from './DateField';
 import { Body, Button, ChipGroup, Field, Label, Row, Screen, Thumb } from './ui';
 
 const GENDERS: { value: Gender; label: string }[] = [
@@ -146,20 +147,22 @@ export function PetForm({
 
           <ChipGroup label="Jenis kelamin" options={GENDERS} value={gender} onChange={setGender} />
 
-          <Field
+          <DateField
             label="Tanggal lahir"
             value={birthDate}
-            onChangeText={setBirthDate}
-            placeholder="YYYY-MM-DD"
+            onChange={setBirthDate}
             helper="Dipakai untuk menghitung umur otomatis."
             error={errors.birthDate}
+            clearable
+            maximumDate={new Date()}
           />
-          <Field
+          <DateField
             label="Tanggal adopsi"
             value={adoptionDate}
-            onChangeText={setAdoptionDate}
-            placeholder="YYYY-MM-DD"
+            onChange={setAdoptionDate}
             error={errors.adoptionDate}
+            clearable
+            maximumDate={new Date()}
           />
           <Field label="Catatan" value={note} onChangeText={setNote} multiline placeholder="Asal, karakter, kandang…" />
 
