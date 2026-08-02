@@ -1,13 +1,19 @@
 {
   "expo": {
-    "name": "dinolog-expo",
+    "name": "DinoLog",
     "slug": "dinolog-expo",
+    "scheme": "dinolog",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.dityuma.dinologexpo",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "DinoLog membutuhkan akses galeri untuk menyimpan foto profil dan dokumentasi log peliharaan Anda.",
+        "NSCameraUsageDescription": "DinoLog membutuhkan akses kamera untuk memotret dokumentasi peliharaan Anda."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -16,10 +22,32 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.dityuma.dinologexpo"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "4e1509c5-95f1-44f5-a23f-641104f93d3b"
+      }
+    },
+    "experiments": {
+      "typedRoutes": true
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      "expo-image",
+      "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "DinoLog membutuhkan akses galeri untuk melampirkan foto pada log peliharaan Anda.",
+          "cameraPermission": "DinoLog membutuhkan akses kamera untuk memotret dokumentasi peliharaan Anda."
+        }
+      ]
+    ]
   }
 }
