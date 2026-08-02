@@ -30,7 +30,9 @@ function uniqueName(ext: string): string {
 export function persistImage(sourceUri: string): string {
   const source = new File(sourceUri);
   const target = new File(mediaDir(), uniqueName(extensionOf(sourceUri)));
-  source.copy(target);
+  // Harus copySync: copy() asinkron, sehingga URI bisa dikembalikan sebelum
+  // filenya benar-benar ada dan pembacaan berikutnya gagal.
+  source.copySync(target);
   return target.uri;
 }
 

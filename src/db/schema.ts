@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 export const DATABASE_NAME = 'dinolog.db';
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 
 /**
  * Migrasi berbasis `PRAGMA user_version`. Tambahkan blok `if (currentDbVersion === n)`
@@ -97,6 +97,29 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
       CREATE INDEX idx_photos_owner   ON photos(owner_type, owner_id);
     `);
     currentDbVersion = 1;
+  }
+
+  if (currentDbVersion === 1) {
+    await db.execAsync(`
+      CREATE TABLE reminders (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        pet_id          INTEGER NOT NULL REFERENCES pets(id) ON DELETE CASCADE,
+        title           TEXT    NOT NULL,
+        kind            TEXT    NOT NULL DEFAULT 'lainnya',
+        repeat_mode     TEXT    NOT NULL DEFAULT 'daily',
+        weekday         INTEGER,
+        day             INTEGER,
+        date            TEXT,
+        hour            INTEGER NOT NULL DEFAULT 8,
+        minute          INTEGER NOT NULL DEFAULT 0,
+        enabled         INTEGER NOT NULL DEFAULT 1,
+        notification_id TEXT,
+        created_at      INTEGER NOT NULL
+      );
+
+      CREATE INDEX idx_reminders_pet ON reminders(pet_id);
+    `);
+    currentDbVersion = 2;
   }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);

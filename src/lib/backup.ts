@@ -2,6 +2,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import type { SQLiteDatabase } from 'expo-sqlite';
+import { rescheduleAllReminders } from '../db/repo';
 import { LOG_TABLES } from '../db/types';
 import { deleteImage, persistImage } from './media';
 
@@ -17,7 +18,7 @@ type BackupPayload = {
   media: Record<string, string>;
 };
 
-const TABLES = ['pets', ...Object.values(LOG_TABLES), 'photos'];
+const TABLES = ['pets', ...Object.values(LOG_TABLES), 'photos', 'reminders'];
 
 function collectMediaUris(tables: BackupPayload['tables']): string[] {
   const uris = new Set<string>();
@@ -86,7 +87,7 @@ export async function exportBackup(db: SQLiteDatabase, includePhotos: boolean): 
   return file.uri;
 }
 
-export type ImportResult = { pets: number; logs: number; photos: number };
+export type ImportResult = { pets: number; logs: number; photos: number; reminders: number };
 
 /**
  * Impor backup. Seluruh data lama dihapus lebih dulu supaya hasil impor
@@ -126,7 +127,7 @@ export async function importBackup(db: SQLiteDatabase): Promise<ImportResult | n
   }
   const mapUri = (uri: string | null) => (uri ? (uriMap[uri] ?? uri) : null);
 
-  const counts: ImportResult = { pets: 0, logs: 0, photos: 0 };
+  const counts: ImportResult = { pets: 0, logs: 0, photos: 0, reminders: 0 };
   // Foto milik data lama, dicatat sebelum dihapus supaya filenya bisa dibersihkan.
   const previousUris = collectMediaUris({
     pets: await db.getAllAsync<Record<string, unknown>>('SELECT photo_uri FROM pets'),
@@ -144,6 +145,9 @@ export async function importBackup(db: SQLiteDatabase): Promise<ImportResult | n
         const data = { ...row } as Record<string, unknown>;
         if (table === 'pets') data.photo_uri = mapUri(data.photo_uri as string | null);
         if (table === 'photos') data.uri = mapUri(data.uri as string) ?? data.uri;
+        // Identifier notifikasi milik perangkat asal tidak berlaku di sini;
+        // jadwalnya dipasang ulang setelah transaksi selesai.
+        if (table === 'reminders') data.notification_id = null;
 
         const keys = Object.keys(data);
         await tx.runAsync(
@@ -155,6 +159,7 @@ export async function importBackup(db: SQLiteDatabase): Promise<ImportResult | n
       }
       if (table === 'pets') counts.pets = rows.length;
       else if (table === 'photos') counts.photos = rows.length;
+      else if (table === 'reminders') counts.reminders = rows.length;
       else counts.logs += rows.length;
     }
   });
@@ -163,6 +168,8 @@ export async function importBackup(db: SQLiteDatabase): Promise<ImportResult | n
   // tidak lagi dirujuk setelah impor yang boleh dihapus.
   const keptUris = new Set(collectMediaUris(payload.tables).map(uri => uriMap[uri] ?? uri));
   previousUris.filter(uri => !keptUris.has(uri)).forEach(deleteImage);
+
+  await rescheduleAllReminders(db);
 
   return counts;
 }

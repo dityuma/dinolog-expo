@@ -76,6 +76,29 @@ export type Photo = {
 
 export type PhotoOwnerType = 'growth' | 'feeding' | 'health' | 'shell' | 'brumation';
 
+export type ReminderKind = 'suplemen' | 'uvb' | 'vet' | 'rendam' | 'lainnya';
+export type RepeatMode = 'daily' | 'weekly' | 'monthly' | 'once';
+
+export type Reminder = {
+  id: number;
+  pet_id: number;
+  title: string;
+  kind: ReminderKind;
+  repeat_mode: RepeatMode;
+  /** 1 = Minggu … 7 = Sabtu, hanya untuk repeat_mode 'weekly'. */
+  weekday: number | null;
+  /** 1–28, hanya untuk repeat_mode 'monthly'. */
+  day: number | null;
+  /** ISO date, hanya untuk repeat_mode 'once'. */
+  date: string | null;
+  hour: number;
+  minute: number;
+  enabled: number;
+  /** Identifier notifikasi terjadwal, dipakai untuk membatalkan. */
+  notification_id: string | null;
+  created_at: number;
+};
+
 /** Maksimum foto per entri log, sesuai PRD. */
 export const MAX_PHOTOS_PER_LOG = 4;
 

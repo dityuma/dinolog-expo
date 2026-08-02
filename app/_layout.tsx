@@ -7,7 +7,11 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ConfirmProvider } from '../src/components/ConfirmDialog';
 import { DATABASE_NAME, migrateDbIfNeeded } from '../src/db/schema';
+import { configureNotificationHandler } from '../src/lib/notifications';
 import { ThemeProvider, useTheme } from '../src/theme/ThemeProvider';
+
+// Dipanggil sekali saat modul dimuat, sebelum komponen apa pun dirender.
+configureNotificationHandler();
 
 function Fallback() {
   return (
@@ -34,6 +38,8 @@ function Navigator() {
         <Stack.Screen name="pet/new" options={{ title: 'Profil Baru', presentation: 'modal' }} />
         <Stack.Screen name="pet/[id]/index" options={{ title: 'Profil' }} />
         <Stack.Screen name="pet/[id]/edit" options={{ title: 'Ubah Profil', presentation: 'modal' }} />
+        <Stack.Screen name="pet/[id]/compare" options={{ title: 'Bandingkan Foto' }} />
+        <Stack.Screen name="pet/[id]/reminders" options={{ title: 'Pengingat' }} />
         <Stack.Screen name="pet/[id]/log/[type]" options={{ presentation: 'modal' }} />
         <Stack.Screen
           name="viewer"

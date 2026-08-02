@@ -28,7 +28,7 @@ eas build --platform android --profile preview
 | `src/lib/` | Util tanggal, penyimpanan media internal, ekspor/impor JSON. |
 | `src/components/` | Komponen UI bertema: grafik pertumbuhan (react-native-svg), pemilih foto, input tanggal, dialog konfirmasi. |
 | `src/theme/` | 8 tema kura-kura, disimpan di AsyncStorage. |
-| `src/logs/` | Metadata tab log: preset pakan, kondisi karapas, teks peringatan. |
+| `src/logs/` | Metadata tab log: preset pakan, kondisi karapas, teks peringatan, panduan per spesies. |
 
 ### Rute
 
@@ -39,8 +39,12 @@ eas build --platform android --profile preview
 /pet/[id]                detail + tab log yang bisa digeser (Tumbuh, Makan, Karapas, Riwayat, Brumasi)
 /pet/[id]/edit           ubah / hapus profil
 /pet/[id]/log/[type]     tambah / ubah / hapus satu entri log
+/pet/[id]/compare        bandingkan dua foto berdampingan
+/pet/[id]/reminders      pengingat lokal (suplemen, UVB, rendam, dokter hewan)
 /viewer                  penampil foto layar penuh
 ```
+
+Laporan PDF dibuat dari layar detail (`src/lib/report.ts` → expo-print → share sheet).
 
 ## Aturan data
 
@@ -52,9 +56,13 @@ eas build --platform android --profile preview
 - **Backup JSON** berisi seluruh tabel; foto ikut disertakan sebagai base64 bila opsinya aktif.
   Impor bersifat *restore* — data lama diganti, bukan digabung.
 
-## Skema database (v1)
+- **Pengingat bersifat lokal.** Dijadwalkan lewat expo-notifications di perangkat, tanpa push server.
+  Identifier notifikasi tidak ikut berlaku antar perangkat, jadi seluruh jadwal dipasang ulang
+  setelah impor backup.
 
-`pets` → `growth_logs`, `feeding_logs`, `health_logs`, `shell_logs`, `brumation_logs`
+## Skema database (v2)
+
+`pets` → `growth_logs`, `feeding_logs`, `health_logs`, `shell_logs`, `brumation_logs`, `reminders`
 (semua `ON DELETE CASCADE`), plus tabel `photos` polimorfik (`owner_type` + `owner_id`,
 maksimum 4 foto per entri log).
 

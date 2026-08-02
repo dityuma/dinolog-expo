@@ -1,6 +1,12 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { deleteImage } from '../lib/media';
 import {
+  cancelAllReminders,
+  cancelReminder,
+  ensureAndroidChannel,
+  scheduleReminder,
+} from '../lib/notifications';
+import {
   LOG_TABLES,
   type BrumationLog,
   type FeedingLog,
@@ -9,6 +15,7 @@ import {
   type Pet,
   type Photo,
   type PhotoOwnerType,
+  type Reminder,
   type ShellLog,
 } from './types';
 
@@ -78,8 +85,17 @@ export async function deletePet(db: SQLiteDatabase, id: number) {
     );
   }
 
+  // Baris pengingat ikut terhapus lewat cascade, tapi notifikasi terjadwalnya
+  // hidup di luar database dan harus dibatalkan sendiri.
+  const reminders = await db.getAllAsync<{ notification_id: string | null }>(
+    'SELECT notification_id FROM reminders WHERE pet_id = ?',
+    id
+  );
+
   await db.runAsync('DELETE FROM pets WHERE id = ?', id);
+
   uris.forEach(deleteImage);
+  for (const reminder of reminders) await cancelReminder(reminder.notification_id);
 }
 
 // ---------------------------------------------------------------- photos
@@ -181,6 +197,88 @@ export const listShell = (db: SQLiteDatabase, petId: number) =>
   logs.list<ShellLog>(db, 'shell', petId);
 export const listBrumation = (db: SQLiteDatabase, petId: number) =>
   logs.list<BrumationLog>(db, 'brumation', petId);
+
+// ---------------------------------------------------------------- reminders
+
+export type ReminderInput = Omit<Reminder, 'id' | 'created_at' | 'notification_id'>;
+
+export async function listReminders(db: SQLiteDatabase, petId: number): Promise<Reminder[]> {
+  return db.getAllAsync<Reminder>(
+    'SELECT * FROM reminders WHERE pet_id = ? ORDER BY enabled DESC, hour, minute, id',
+    petId
+  );
+}
+
+/**
+ * Simpan pengingat lalu segarkan jadwal notifikasinya. Notifikasi lama selalu
+ * dibatalkan lebih dulu agar tidak ada jadwal yatim yang tetap berbunyi.
+ */
+export async function saveReminder(
+  db: SQLiteDatabase,
+  id: number | null,
+  input: ReminderInput,
+  petName: string
+): Promise<number> {
+  let rowId = id ?? 0;
+
+  if (id == null) {
+    const { sql, values } = buildInsert('reminders', { ...input, created_at: Date.now() });
+    const result = await db.runAsync(sql, ...values);
+    rowId = result.lastInsertRowId;
+  } else {
+    const previous = await db.getFirstAsync<Reminder>('SELECT * FROM reminders WHERE id = ?', id);
+    await cancelReminder(previous?.notification_id);
+    const { sql, values } = buildUpdate('reminders', id, { ...input });
+    await db.runAsync(sql, ...values);
+  }
+
+  const saved = await db.getFirstAsync<Reminder>('SELECT * FROM reminders WHERE id = ?', rowId);
+  const notificationId = saved ? await scheduleReminder(saved, petName) : null;
+  await db.runAsync('UPDATE reminders SET notification_id = ? WHERE id = ?', notificationId, rowId);
+  return rowId;
+}
+
+export async function setReminderEnabled(
+  db: SQLiteDatabase,
+  id: number,
+  enabled: boolean,
+  petName: string
+) {
+  const reminder = await db.getFirstAsync<Reminder>('SELECT * FROM reminders WHERE id = ?', id);
+  if (!reminder) return;
+
+  await cancelReminder(reminder.notification_id);
+  const next = { ...reminder, enabled: enabled ? 1 : 0 };
+  const notificationId = enabled ? await scheduleReminder(next, petName) : null;
+  await db.runAsync(
+    'UPDATE reminders SET enabled = ?, notification_id = ? WHERE id = ?',
+    enabled ? 1 : 0,
+    notificationId,
+    id
+  );
+}
+
+export async function deleteReminder(db: SQLiteDatabase, id: number) {
+  const reminder = await db.getFirstAsync<Reminder>('SELECT * FROM reminders WHERE id = ?', id);
+  await cancelReminder(reminder?.notification_id);
+  await db.runAsync('DELETE FROM reminders WHERE id = ?', id);
+}
+
+/**
+ * Pasang ulang seluruh jadwal dari isi database. Dipakai setelah impor backup,
+ * karena identifier notifikasi dari perangkat lama tidak berlaku di sini.
+ */
+export async function rescheduleAllReminders(db: SQLiteDatabase) {
+  await ensureAndroidChannel();
+  await cancelAllReminders();
+  const rows = await db.getAllAsync<Reminder & { pet_name: string }>(
+    `SELECT r.*, p.name AS pet_name FROM reminders r JOIN pets p ON p.id = r.pet_id`
+  );
+  for (const row of rows) {
+    const notificationId = row.enabled ? await scheduleReminder(row, row.pet_name) : null;
+    await db.runAsync('UPDATE reminders SET notification_id = ? WHERE id = ?', notificationId, row.id);
+  }
+}
 
 /** Ringkasan untuk kartu profil di daftar hewan. */
 export async function petSummary(db: SQLiteDatabase, petId: number) {

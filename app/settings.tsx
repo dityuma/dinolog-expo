@@ -45,7 +45,7 @@ export default function SettingsScreen() {
       if (result) {
         Alert.alert(
           'Impor selesai',
-          `${result.pets} profil, ${result.logs} catatan, dan ${result.photos} foto dipulihkan.`,
+          `${result.pets} profil, ${result.logs} catatan, ${result.photos} foto, dan ${result.reminders} pengingat dipulihkan.`,
           [{ text: 'OK', onPress: () => router.replace('/') }]
         );
       }

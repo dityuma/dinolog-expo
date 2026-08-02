@@ -2,9 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { useRef, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Alert, Pressable, ScrollView, View } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import { GrowthChart } from '../../../src/components/GrowthChart';
+import { SpeciesGuideCard } from '../../../src/components/SpeciesGuideCard';
 import {
   Badge,
   Body,
@@ -29,6 +30,7 @@ import type {
 } from '../../../src/db/types';
 import { useDbQuery } from '../../../src/hooks/useDbQuery';
 import { daysBetween, formatAge, formatDate } from '../../../src/lib/date';
+import { exportPetReport } from '../../../src/lib/report';
 import {
   EMPTY_STATES,
   SHELL_CONDITIONS,
@@ -36,6 +38,7 @@ import {
   shellCondition,
   type TabKey,
 } from '../../../src/logs/meta';
+import { findSpeciesGuide, type SpeciesGuide } from '../../../src/logs/species';
 import { useTheme } from '../../../src/theme/ThemeProvider';
 
 type Entry = { row: Record<string, unknown>; photos: Photo[] };
@@ -64,8 +67,20 @@ export default function PetDetailScreen() {
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>('growth');
   const pager = useRef<PagerView>(null);
+  const [exporting, setExporting] = useState(false);
 
-  const { data, loading } = useDbQuery(db => loadPetData(db, petId), [petId]);
+  const { data, loading, db } = useDbQuery(database => loadPetData(database, petId), [petId]);
+
+  const exportReport = async () => {
+    setExporting(true);
+    try {
+      await exportPetReport(db, petId, theme);
+    } catch (error) {
+      Alert.alert('Gagal membuat laporan', (error as Error).message);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   if (!data?.pet) {
     return (
@@ -77,6 +92,7 @@ export default function PetDetailScreen() {
 
   const { pet, entries } = data;
   const activeIndex = TABS.findIndex(item => item.key === tab);
+  const guide = findSpeciesGuide(pet.species);
 
   return (
     <Screen>
@@ -95,6 +111,25 @@ export default function PetDetailScreen() {
 
       <View style={{ padding: 16, paddingBottom: 0, gap: 12 }}>
         <ProfileCard pet={pet} />
+
+        <Row style={{ gap: 8 }}>
+          <QuickAction
+            icon={exporting ? 'hourglass-outline' : 'document-text-outline'}
+            label={exporting ? 'Menyiapkan…' : 'Laporan PDF'}
+            disabled={exporting}
+            onPress={exportReport}
+          />
+          <QuickAction
+            icon="git-compare-outline"
+            label="Bandingkan"
+            onPress={() => router.push({ pathname: '/pet/[id]/compare', params: { id: petId } })}
+          />
+          <QuickAction
+            icon="notifications-outline"
+            label="Pengingat"
+            onPress={() => router.push({ pathname: '/pet/[id]/reminders', params: { id: petId } })}
+          />
+        </Row>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
           {TABS.map((item, index) => {
@@ -153,6 +188,7 @@ export default function PetDetailScreen() {
             <TabPage
               tab={item.key}
               entries={entries[item.key]}
+              guide={guide}
               onOpen={logId =>
                 router.push({
                   pathname: '/pet/[id]/log/[type]',
@@ -177,14 +213,51 @@ export default function PetDetailScreen() {
   );
 }
 
+function QuickAction({
+  icon,
+  label,
+  onPress,
+  disabled,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
+  const { theme } = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => ({
+        flex: 1,
+        alignItems: 'center',
+        gap: 4,
+        paddingVertical: 10,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        backgroundColor: theme.colors.surface,
+        opacity: pressed || disabled ? 0.6 : 1,
+      })}>
+      <Ionicons name={icon} size={19} color={theme.colors.primary} />
+      <Body style={{ fontSize: 11 }} numberOfLines={1}>
+        {label}
+      </Body>
+    </Pressable>
+  );
+}
+
 /** Satu halaman pager: isi salah satu kategori log, bisa digulir sendiri. */
 function TabPage({
   tab,
   entries,
+  guide,
   onOpen,
 }: {
   tab: TabKey;
   entries: Entry[];
+  guide: SpeciesGuide | null;
   onOpen: (logId: number) => void;
 }) {
   const empty = EMPTY_STATES[tab];
@@ -197,7 +270,13 @@ function TabPage({
         </Card>
       ) : null}
 
+      {tab === 'feeding' && guide ? <SpeciesGuideCard guide={guide} /> : null}
+
       {tab === 'shell' ? <ShellWarnings entries={entries} /> : null}
+
+      {tab === 'brumation' && guide && !guide.brumates ? (
+        <NonBrumatingWarning guide={guide} />
+      ) : null}
 
       {entries.length === 0 ? (
         <EmptyState
@@ -261,6 +340,29 @@ function ProfileCard({ pet }: { pet: Pet }) {
           {pet.note}
         </Body>
       ) : null}
+    </Card>
+  );
+}
+
+/**
+ * Kura tropis tidak brumasi. Mendinginkan mereka dengan sengaja berbahaya,
+ * jadi peringatan ini muncul sebelum pengguna mencatat brumasi.
+ */
+function NonBrumatingWarning({ guide }: { guide: SpeciesGuide }) {
+  const { theme } = useTheme();
+  return (
+    <Card style={{ borderColor: theme.colors.danger, backgroundColor: theme.colors.danger + '14' }}>
+      <Row>
+        <Ionicons name="alert-circle-outline" size={18} color={theme.colors.danger} />
+        <Title style={{ fontSize: 15, color: theme.colors.danger }}>
+          {guide.label} tidak brumasi
+        </Title>
+      </Row>
+      <Body style={{ fontSize: 13 }}>
+        Spesies tropis seperti {guide.label} tidak melakukan brumasi alami. Hewan yang tampak diam,
+        tidak mau makan, dan bersembunyi biasanya sedang kedinginan atau sakit — bukan brumasi.
+        Periksa suhu kandang dan konsultasikan ke dokter hewan eksotik sebelum mengasumsikan brumasi.
+      </Body>
     </Card>
   );
 }

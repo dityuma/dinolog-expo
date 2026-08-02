@@ -6,7 +6,7 @@ import { useConfirm } from '../../../../src/components/ConfirmDialog';
 import { DateField } from '../../../../src/components/DateField';
 import { PhotoPicker } from '../../../../src/components/PhotoPicker';
 import { Body, Button, Card, ChipGroup, Field, Row, Screen, Title } from '../../../../src/components/ui';
-import { listPhotos, logs } from '../../../../src/db/repo';
+import { getPet, listPhotos, logs } from '../../../../src/db/repo';
 import type { PhotoOwnerType } from '../../../../src/db/types';
 import { isValidISODate, parseISODate, today } from '../../../../src/lib/date';
 import {
@@ -17,6 +17,7 @@ import {
   TAB_TITLE,
   shellCondition,
 } from '../../../../src/logs/meta';
+import { findSpeciesGuide, type SpeciesGuide } from '../../../../src/logs/species';
 import { useTheme } from '../../../../src/theme/ThemeProvider';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -59,6 +60,17 @@ export default function LogFormScreen() {
   const [errors, setErrors] = useState<FormState>({});
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(editingId != null);
+  const [guide, setGuide] = useState<SpeciesGuide | null>(null);
+
+  useEffect(() => {
+    if (ownerType !== 'feeding') return;
+    void getPet(db, petId).then(pet => setGuide(findSpeciesGuide(pet?.species)));
+  }, [db, petId, ownerType]);
+
+  // Pakan yang cocok untuk spesies ini didahulukan, sisanya tetap tersedia.
+  const foodPresets = guide
+    ? [...guide.staple, ...FOOD_PRESETS.filter(item => !guide.staple.includes(item))]
+    : FOOD_PRESETS;
 
   useEffect(() => {
     if (editingId == null) return;
@@ -270,11 +282,16 @@ export default function LogFormScreen() {
                 error={errors.food_type}
               />
               <ChipGroup
-                label="Preset pakan"
-                options={FOOD_PRESETS.map(f => ({ value: f, label: f }))}
+                label={guide ? `Preset pakan · ${guide.label}` : 'Preset pakan'}
+                options={foodPresets.map(f => ({ value: f, label: f }))}
                 value={form.food_type}
                 onChange={set('food_type')}
               />
+              {guide ? (
+                <Body muted style={{ fontSize: 12 }}>
+                  Hindari untuk {guide.label}: {guide.avoid.join(', ').toLowerCase()}.
+                </Body>
+              ) : null}
               <Field label="Porsi" value={form.amount} onChangeText={set('amount')} placeholder="Contoh: 2 genggam" />
               <ChipGroup
                 label="Frekuensi"
